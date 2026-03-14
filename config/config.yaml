@@ -1,0 +1,28 @@
+api:
+  base_url: "https://api.kksi.org/v1/chat/completions"  
+  api_key: "sk-hyexJgLIG8mZWfxxz7oKV6H2sITMipAQftVZD5A8NJ1154Ni" 
+  model: "gpt-4o"
+
+model:
+  name_or_path: "Qwen/Qwen2.5-7B-Instruct" 
+  dtype: "fp16"
+
+lora:
+  r: 8
+  lora_alpha: 32
+  lora_dropout: 0.1
+  target_modules: "q_proj,v_proj" 
+  bias: "none"
+
+training:
+  num_train_epochs: 10
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  # 论文使用 5 个学习率候选；在测试集精度上选最优
+  learning_rate: 2e-5                         # 候选：1e-5,2e-5,3e-5,4e-5,5e-5
+  max_grad_norm: 1.0
+  max_length: 1024
+  save_steps: 500
+  logging_steps: 50
+  seed: 42
+
