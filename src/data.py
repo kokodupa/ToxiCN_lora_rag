@@ -4,7 +4,6 @@ sys.path.insert(0, '..')
 import json
 import pandas as pd
 from collections import Counter  
-import matplotlib.pyplot as plt  
 
 import os
 os.chdir(os.path.dirname(__file__))
@@ -92,12 +91,16 @@ def load_dataset(path):
     return result
 
 
+def main():
+    result = load_dataset("../data/train.json")
+    with open("../data/train_data.json", "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=4)
+    # print("Dataset saved to train_output.json")
+    result = load_dataset("../data/test.json")
+    with open("../data/test_data.json", "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=4)
+    # print("Dataset saved to test_output.json")
 
-result = load_dataset("../data/train.json")
-with open("../data/train_output.json", "w", encoding="utf-8") as f:
-    json.dump(result, f, ensure_ascii=False, indent=4)
-print("Dataset saved to train_output.json")
-result = load_dataset("../data/test.json")
-with open("../data/test_output.json", "w", encoding="utf-8") as f:
-    json.dump(result, f, ensure_ascii=False, indent=4)
-print("Dataset saved to test_output.json")
+
+if __name__ == "__main__":
+    main()

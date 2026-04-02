@@ -10,6 +10,8 @@ def calculate_similarity(pred_text, gold_text):
     """
     使用difflib.SequenceMatcher计算两个字符串的相似度
     """
+    pred_text = str(pred_text)  # 强制转为字符串
+    gold_text = str(gold_text)  # 强制转为字符串
     seq_matcher = difflib.SequenceMatcher(None, pred_text, gold_text)
     similarity = seq_matcher.ratio()
     return similarity
@@ -17,10 +19,10 @@ def calculate_similarity(pred_text, gold_text):
 
 '''硬匹配'''
 def is_hard_match(pred_quad, gold_quad):
-    return (pred_quad['Target'] == gold_quad['Target'] and
-            pred_quad['Argument'] == gold_quad['Argument'] and
-            pred_quad['Targeted_Group'] == gold_quad['Targeted_Group'] and
-            pred_quad['Hateful'] == gold_quad['Hateful'])
+    return (pred_quad['target'] == gold_quad['target'] and
+            pred_quad['argument'] == gold_quad['argument'] and
+            pred_quad['group'] == gold_quad['group'] and
+            pred_quad['hateful'] == gold_quad['hateful'])
 
 
 '''软匹配'''
@@ -30,15 +32,15 @@ def is_soft_match(pred_quad, gold_quad):
     软匹配：Targeted_Group和Hateful完全一致，Target和Argument相似度>0.5
     """
     # 必须完全匹配的元素
-    if (pred_quad['Targeted_Group'] != gold_quad['Targeted_Group'] or
-            pred_quad['Hateful'] != gold_quad['Hateful']):
+    if (pred_quad['group'] != gold_quad['group'] or
+            pred_quad['hateful'] != gold_quad['hateful']):
         return False
     
     # 计算Target的相似度
-    target_similarity = calculate_similarity(pred_quad['Target'], gold_quad['Target'])
+    target_similarity = calculate_similarity(pred_quad['target'], gold_quad['target'])
     
     # 计算Argument的相似度
-    argument_similarity = calculate_similarity(pred_quad['Argument'], gold_quad['Argument'])
+    argument_similarity = calculate_similarity(pred_quad['argument'], gold_quad['argument'])
     
     # 如果相似度都超过0.5则匹配成功
     return target_similarity > 0.5 and argument_similarity > 0.5
