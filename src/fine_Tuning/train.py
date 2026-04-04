@@ -43,7 +43,6 @@ def format_dataset_json(input_path, output_path):
         for line in f:
             try:
                 data = json.loads(line)
-                # 构建标准指令格式
                 formatted_example = {
                     "instruction": SYSTEM_MESSAGE + INSTRUCTION,
                     "input": data.get("content", ""),
@@ -59,31 +58,8 @@ def format_dataset_json(input_path, output_path):
             f.write(json.dumps(example, ensure_ascii=False) + "\n")
     
     print(f"数据集已格式化并保存到: {output_path}，共 {len(formatted_data)} 条样本")
-
-
-# def preprocess_function(example, tokenizer):
-#     conversation = [
-#         {"role": "system", "content": SYSTEM_MESSAGE},
-#         {"role": "user", "content": example["input"]},
-#         {"role": "assistant", "content": example["output"]}
-#     ]
-
-#     text = tokenizer.apply_chat_template(
-#         conversation,
-#         tokenize=False,
-#         add_generation_prompt=False  # 训练时不添加生成提示
-#     )
-
-#     tokenized = tokenizer(
-#         text,
-#         truncation=True,
-#         max_length=MAX_LENGTH,
-#         padding=False  # 在DataCollator中统一处理padding
-#     )
-
-#     tokenized["labels"] = tokenized["input_ids"].copy()
     
-#     return tokenized
+
 def preprocess_function(example, tokenizer):
     messages = [
         {"role": "system", "content": SYSTEM_MESSAGE + "\n" + INSTRUCTION},
@@ -175,7 +151,6 @@ def load_model_and_tokenizer():
 def train_model(model, tokenizer, train_dataset, eval_dataset):
     print("开始配置训练参数...")
     output_path = os.path.join(project_root, OUTPUT_DIR)
-    # 训练参数配置
     # 训练参数配置
     training_args = TrainingArguments(
         # 输出目录

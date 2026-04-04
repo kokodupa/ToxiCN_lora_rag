@@ -60,7 +60,7 @@ def ensure_bm25_index():
     tokenized_corpus = [jieba.lcut(doc['full_text']) for doc in _bm25_corpus]
     _bm25_index = BM25Okapi(tokenized_corpus)
 
-# ---------- 向量数据库（持久化） ----------
+
 class VectorDatabase:
     def __init__(self, documents, persist_dir: str = "./model/chroma"):
         self.documents = documents
@@ -96,7 +96,7 @@ class VectorDatabase:
         print(f"向量数据库构建完成，共 {len(self.documents)} 条数据")
         return self.collection
 
-# ---------- 检索（稠密 + 稀疏混合） ----------
+
 def dense_search_internal(query, collection, top_k=20):
     """稠密检索（向量相似度）"""
     embedding_model = get_embedding_model()
@@ -177,7 +177,7 @@ def rag_retrieval(query, collection, top_k=10, alpha=0.6):
     fused = fuse_dense_sparse(dense_hits, sparse_hits, alpha=alpha)
     return fused[:top_k]
 
-# ---------- 重排序 ----------
+
 class CrossEncoderReranker:
     def __init__(self, model_name: str = "BAAI/bge-reranker-base", device=None):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -215,7 +215,7 @@ class CrossEncoderReranker:
         candidates.sort(key=lambda x: x["rerank_score"], reverse=True)
         return candidates[:top_k]
 
-# ---------- 生成答案 ----------
+
 class AnswerGenerator:
     def __init__(self, model_path=TRAIN_MODEL_PATH, max_input_length=2048,
                  max_new_tokens=256, temperature=0.2):
