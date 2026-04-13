@@ -43,12 +43,12 @@ from config.config import OUTPUT_DATA_PATH
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(current_dir))
 output_dir = os.path.join(project_root, OUTPUT_DIR)
-lora_adapter_path = os.path.join(output_dir, "final_lora_adapter")
+# lora_adapter_path = os.path.join(output_dir, "final_lora_adapter")
 model_path = os.path.abspath(os.path.join(project_root, "./model/Qwen2.5-7B-Instruct"))
-test_data_path = os.path.join(project_root, TEST_DATA_PATH)
+# test_data_path = os.path.join(project_root, TEST_DATA_PATH)
 
 class QwenLoraVLLMInference:
-    def __init__(self, base_model_path, lora_path, tensor_parallel_size=1, max_model_len=2048):
+    def __init__(self, base_model_path, lora_path, tensor_parallel_size=1, max_model_len=512):
         """
         :param base_model_path: 基础模型路径
         :param lora_path: LoRA适配器路径
@@ -76,7 +76,7 @@ class QwenLoraVLLMInference:
     def apply_chat_template(self, question):
         """将单个问题应用对话模板，返回 prompt 字符串"""
         messages = [
-            {"role": "system", "content": SYSTEM_MESSAGE + "\n" + INSTRUCTION},
+            {"role": "system", "content": SYSTEM_MESSAGE},
             {"role": "user", "content": question}
         ]
         prompt = self.tokenizer.apply_chat_template(
@@ -114,7 +114,7 @@ class QwenLoraVLLMInference:
         return responses
 
 
-if __name__ == "__main__":
+def inference_main(test_data_path, lora_model_path, output_json_path):
     # 加载测试数据
     print("加载测试数据...")
     with open(test_data_path, "r", encoding="utf-8") as f:
@@ -124,266 +124,57 @@ if __name__ == "__main__":
     print("初始化推理引擎...")
     infer = QwenLoraVLLMInference(
         base_model_path=model_path,
-        lora_path=lora_adapter_path,
+        lora_path=lora_model_path,
         tensor_parallel_size=1,       # 单卡 A10，设为1即可
         max_model_len=2048            # 根据你的最大长度调整
     )
 
     # 提取所有问题
     print("提取所有问题...")
+    # data_list = data_list[:5]
+    
     dataid = [item["id"] for item in data_list]
     questions = [item["content"] for item in data_list]
+    prompts = [item["prompt"] for item in data_list]
     ground_truths = [item.get("output", "") for item in data_list]
 
     # 批量推理（可设置批次大小，vLLM 内部会自动分批，也可以自己分批）
+    # print("批量推理...")
+    # batch_size = 8   # 根据显存调整
+    # results = []
+    # for i in tqdm(range(0, len(questions), batch_size), desc="批量推理"):
+    #     batch_questions = questions[i:i+batch_size]
+    #     batch_preds = infer.batch_generate(batch_questions, max_new_tokens=512, temperature=0.0)
+    #     for j, pred in enumerate(batch_preds):
+    #         idx = i + j
+    #         results.append({
+    #             "id": dataid[idx],
+    #             "content": questions[idx],
+    #             "ground_truth": ground_truths[idx],
+    #             "output": pred
+    #         })
     print("批量推理...")
-    batch_size = 8   # 根据显存调整
+    batch_size = 8
     results = []
-    for i in tqdm(range(0, len(questions), batch_size), desc="批量推理"):
-        batch_questions = questions[i:i+batch_size]
-        batch_preds = infer.batch_generate(batch_questions, max_new_tokens=512, temperature=0.0)
+    for i in tqdm(range(0, len(prompts), batch_size), desc="批量推理"):
+        batch_prompts = prompts[i:i+batch_size]
+        batch_preds = infer.batch_generate(batch_prompts, max_new_tokens=512, temperature=0.0)
         for j, pred in enumerate(batch_preds):
             idx = i + j
-            results.append({
-                "id": dataid[idx],
-                "content": questions[idx],
-                "ground_truth": ground_truths[idx],
-                "output": pred
-            })
+            results.append(
+                {
+                    "id": dataid[idx],
+                    "content": questions[idx],
+                    "ground_truth": ground_truths[idx],
+                    "output": pred
+                }
+            )
 
     # 保存结果
     print("保存结果...")
     data_output_dir = os.path.join(project_root, OUTPUT_DATA_PATH)
-    save_path = os.path.join(data_output_dir, "test_results_vllm.json")
+    save_path = os.path.join(data_output_dir, output_json_path)
     with open(save_path, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
     print(f"结果保存至 {save_path}")
 
-#版本2
-# class QwenLoraInference:
-#     def __init__(self, base_model_path=base_model_path, lora_path=lora_adapter_path):
-#         print(f"加载基础模型: {base_model_path}")
-#         self.tokenizer = AutoTokenizer.from_pretrained(
-#             base_model_path, use_fast=False, trust_remote_code=True
-#         )
-#         if self.tokenizer.pad_token is None:
-#             self.tokenizer.pad_token = self.tokenizer.eos_token
-
-#         base_model = AutoModelForCausalLM.from_pretrained(
-#             base_model_path,
-#             device_map="auto",
-#             torch_dtype=torch.bfloat16,
-#             trust_remote_code=True,
-#         )
-#         self.model = PeftModel.from_pretrained(base_model, lora_path, device_map="auto")
-#         self.model.eval()
-#         print("LoRA 适配器加载完成")
-
-#     def generate_response(self, question, max_new_tokens=300, temperature=0.0, do_sample=False):
-#         # 注意：必须与训练时的 system 消息一致
-#         messages = [
-#             {"role": "system", "content": SYSTEM_MESSAGE + "\n" + INSTRUCTION},
-#             {"role": "user", "content": question}
-#         ]
-#         text = self.tokenizer.apply_chat_template(
-#             messages, tokenize=False, add_generation_prompt=True
-#         )
-#         inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
-
-#         with torch.inference_mode():
-#             outputs = self.model.generate(
-#                 **inputs,
-#                 max_new_tokens=max_new_tokens,
-#                 temperature=temperature,
-#                 do_sample=do_sample,
-#                 top_p=0.9 if do_sample else None,
-#                 repetition_penalty=1.1,
-#                 eos_token_id=self.tokenizer.eos_token_id,
-#                 pad_token_id=self.tokenizer.pad_token_id,
-#             )
-#         # 只解码新生成的部分
-#         input_len = inputs.input_ids.shape[1]
-#         generated = outputs[0][input_len:]
-#         response = self.tokenizer.decode(generated, skip_special_tokens=True)
-#         return response.strip()
-
-# if __name__ == "__main__":
-#     # 加载测试数据
-#     test_data_path = os.path.join(project_root, TEST_DATA_PATH)  
-#     with open(test_data_path, "r", encoding="utf-8") as f:
-#         data_list = json.load(f)
-
-#     infer = QwenLoraInference()
-#     results = []
-#     for item in tqdm(data_list, desc="推理中"):
-#         question = item["content"]
-#         pred = infer.generate_response(question)
-#         results.append({
-#             "content": question,
-#             "ground_truth": item.get("output", ""),
-#             "prediction": pred
-#         })
-
-#     # 保存结果
-#     save_path = os.path.join(output_dir, "test_results.json")
-#     with open(save_path, "w", encoding="utf-8") as f:
-#         json.dump(results, f, ensure_ascii=False, indent=2)
-#     print(f"结果保存至 {save_path}")
-
-#版本1
-# output_path = os.path.join(project_root, OUTPUT_DIR)
-
-# class QwenLoraInference:
-#     """LoRA微调后的推理类"""
-    
-#     def __init__(self, base_model_name: str = None, lora_adapter_path: str = None):
-#         """
-#         初始化推理模型
-        
-#         参数:
-#             base_model_name: 基础模型名称或路径
-#             lora_adapter_path: LoRA适配器路径
-#         """
-#         base_model_name = os.path.abspath(os.path.join(project_root, "./model/Qwen2.5-7B-Instruct"))
-
-#         if lora_adapter_path is None:
-#             lora_adapter_path = os.path.join(output_path, "final_lora_adapter")
-        
-#         print(f"加载基础模型: {base_model_name}")
-#         print(f"加载LoRA适配器: {lora_adapter_path}")
-        
-#         # 加载基础模型
-          
-#         self.tokenizer = AutoTokenizer.from_pretrained(
-#             base_model_name,
-#             use_fast=False,
-#             trust_remote_code=True
-#         )
-        
-#         self.base_model = AutoModelForCausalLM.from_pretrained(
-#             base_model_name,
-#             device_map="auto",
-#             torch_dtype=torch.bfloat16,
-#             trust_remote_code=True,
-#         )
-        
-#         # 加载LoRA适配器
-#         self.model = PeftModel.from_pretrained(
-#             self.base_model,
-#             lora_adapter_path,
-#             device_map="auto"
-#         )
-        
-#         # 设置为评估模式
-#         self.model.eval()
-#         self.base_model.eval()
-#         print("推理模型加载完成！")
-    
-#     def generate_response(self,question: str, model: str = 'ft', max_new_tokens: int = 1324,temperature: float = 0.7,do_sample: bool = True) -> str:
-#         """
-#         生成回答
-        
-#         参数:
-#             question: 用户问题
-#             max_new_tokens: 最大生成token数
-#             temperature: 温度参数（控制随机性）
-#             do_sample: 是否使用采样
-        
-#         返回:
-#             模型生成的回答
-#         """
-#         model = self.model if model=='ft' else self.base_model
-#         # 构建对话
-#         messages = [
-#             {"role": "system", "content": SYSTEM_MESSAGE + "\n" + INSTRUCTION},
-#             {"role": "user", "content": question}
-#         ]
-        
-#         # 应用聊天模板
-#         text = self.tokenizer.apply_chat_template(
-#             messages,
-#             tokenize=False,
-#             add_generation_prompt=True
-#         )
-        
-#         # 编码输入
-#         inputs = self.tokenizer(text, return_tensors="pt").to(model.device)
-        
-#         # 生成参数
-#         generation_config = {
-#             "max_new_tokens": max_new_tokens,
-#             "temperature": temperature,
-#             "do_sample": do_sample,
-#             "top_p": 0.9,
-#             "repetition_penalty": 1.1,
-#             "eos_token_id": self.tokenizer.eos_token_id,
-#             "pad_token_id": self.tokenizer.pad_token_id,
-#         }
-        
-#         # 生成回答
-#         with torch.no_grad():
-#             outputs = model.generate(
-#                 **inputs,
-#                 **generation_config
-#             )
-        
-#         # 解码并提取助手回复
-#         full_response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-#         # 提取助手部分（从"assistant"标签后开始）
-#         assistant_marker = "<|im_start|>assistant\n"
-#         if assistant_marker in full_response:
-#             response = full_response.split(assistant_marker)[-1]
-#         else:
-#             response = full_response
-        
-#         return response.strip()
-    
-#     def batch_predict(self, questions, max_new_tokens= 512) :
-#         """
-#         批量预测
-        
-#         参数:
-#             questions: 问题列表
-#             max_new_tokens: 最大生成token数
-        
-#         返回:
-#             回答列表
-#         """
-#         responses = []
-#         for i, question in enumerate(questions):
-#             print(f"处理问题 {i+1}/{len(questions)}: {question[:50]}...")
-#             response = self.generate_response(question, max_new_tokens)
-#             responses.append(response)
-#         return responses
-    
-
-# if __name__ == "__main__":
-#     inference_model = QwenLoraInference()
-
-#     print("加载测试数据...")
-#     test_data_path = os.path.join(project_root, TEST_DATA_PATH)
-#     with open(test_data_path, "r", encoding="utf-8") as f:
-#         data_list = json.load(f)
-
-#     test_questions = [item["content"] for item in data_list]
-
-#     print("\n测试推理结果:")
-#     print("-" * 50)
-    
-#     test_results = []
-#     for i, question in enumerate(test_questions):
-#         print(f"\n问题 {i+1}: {question}")
-#         response = inference_model.generate_response(question, max_new_tokens=300)
-#         print(f"回答: {response}")
-        
-#         # 记录到SwanLab
-#         test_results.append({
-#             "content": question,
-#             "output": response
-#         })
-
-#     with open(os.path.join(output_path, "test_results.json"), "w", encoding="utf-8") as f:
-#         json.dump(test_results, f, ensure_ascii=False, indent=2)
-    
-#     print(f"\n测试结果已保存到: {os.path.join(output_path, 'test_results.json')}")
