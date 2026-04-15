@@ -43,7 +43,7 @@ def qwen_model_batch(messages_list):
 
 # 删除了未使用的 qwen_model 和 api_model 函数（如有需要可保留，但需修正）
 
-def run_inference(mode, batch_size=4):
+def run_inference(save_path, mode, num = 0, batch_size=4,):
     test_data = load_json("../data/test_data.json")
     # test_data = test_data[:6]  # 如果需要全量数据，请注释掉这一行
     gold_data = [{"id": d["id"], "content": d["content"], "quadruples": d["quadruples"]} for d in test_data]
@@ -51,25 +51,19 @@ def run_inference(mode, batch_size=4):
     
     for i in range(0, len(test_data), batch_size):
         batch = test_data[i:i+batch_size]
-        messages_batch = [build_prompt(d["content"], mode) for d in batch]
+        messages_batch = [build_prompt(d["content"], mode, num) for d in batch]
         responses = qwen_model_batch(messages_batch)
         for d, resp in zip(batch, responses):
             pred_quads = str_to_quadruples(resp)
             pred_data.append({
                 "id": d["id"],
                 "content": d["content"],
+                'ground_truth': d['output'],
                 'output': resp,
-                "quadruples": pred_quads
+                # "quadruples": pred_quads
             })
     
         # 全部处理完后一次性保存
-        with open(f"../data/{mode}_prompt_output.json", "w", encoding="utf-8") as f:
-            json.dump(pred_data, f, ensure_ascii=False, indent=2)
-    
-    return evaluate(gold_data, pred_data)
+    with open(save_path, "w", encoding="utf-8") as f:
+        json.dump(pred_data, f, ensure_ascii=False, indent=2)
 
-# "零样本"
-# zero_results = run_inference(mode = '1')
-# print(f"Hard Score: {zero_results['hard_f1']:.4f}")
-# print(f"Soft Score: {zero_results['soft_f1']:.4f}")
-# print(f"Score: {zero_results['avg_f1']:.4f}")
