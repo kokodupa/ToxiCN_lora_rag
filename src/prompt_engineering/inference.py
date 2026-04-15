@@ -1,10 +1,14 @@
 import json
 import os
+import sys
 from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
-from data import load_json, str_to_quadruples
-from evaluate import evaluate
-from prompt_engineering.get_prompts import build_prompt
+current_dir = os.path.dirname(os.path.abspath(__file__))          # src/fine_Tuning
+project_root = os.path.dirname(os.path.dirname(current_dir))     # 项目根目录
+sys.path.insert(0, project_root)
+from src.data import load_json, str_to_quadruples
+# from evaluate import evaluate
+from src.prompt_engineering.get_prompts import build_prompt
 
 os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -43,7 +47,7 @@ def qwen_model_batch(messages_list):
 
 # 删除了未使用的 qwen_model 和 api_model 函数（如有需要可保留，但需修正）
 
-def run_inference(save_path, mode, num = 0, batch_size=4,):
+def run_inference(save_path, mode, num = 0, batch_size=4):
     test_data = load_json("../data/test_data.json")
     # test_data = test_data[:6]  # 如果需要全量数据，请注释掉这一行
     gold_data = [{"id": d["id"], "content": d["content"], "quadruples": d["quadruples"]} for d in test_data]
